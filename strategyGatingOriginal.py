@@ -7,8 +7,6 @@ import random #used for the random choice of a strategy
 import sys
 import numpy as np
 import math
-import time
-import os
 
 #--------------------------------------
 # Position of the goal:
@@ -42,53 +40,9 @@ angleRMin=144
 angleRMax=199
 
 # Q-learning related stuff:
-# definition of states at time t and t-1
+# definition of states at time t and t+1
 S_t = ''
 S_tm1 = ''
-
-qdict = dict()
-alpha=0.4
-beta=4
-gamma=0.95
-wasChanged = False
-
-#From TME1
-def softmax(Q,x,beta):
-    # Returns a soft-max probability distribution over actions
-    # Inputs :
-    # - Q : a Q-function represented as a nX times nU matrix
-    # - x : the state for which we want the soft-max distribution
-    # - tau : temperature parameter of the soft-max distribution
-    # Output :
-    # - p : probability of each action according to the soft-max distribution
-    
-    p = np.zeros((len(Q[x])))
-    sump = 0
-    for i in range(len(p)) :
-        p[i] = np.exp((Q[x][i] * beta))
-        sump += p[i]
-    
-    p = p/sump
-    
-    return p
-
-#From TME1
-def discreteProb(p):
-    # Draw a random number using probability table p (column vector)
-    # Suppose probabilities p=[p(1) ... p(n)] for the values [1:n] are given, sum(p)=1
-    # and the components p(j) are nonnegative.
-    # To generate a random sample of size m from this distribution,
-    #imagine that the interval (0,1) is divided into intervals with the lengths p(1),...,p(n).
-    # Generate a uniform number rand, if this number falls in the jth interval given the discrete distribution,
-    # return the value j. Repeat m times.
-    r = np.random.random()
-    cumprob=np.hstack((np.zeros(1),p.cumsum()))
-    sample = -1
-    for j in range(p.size):
-        if (r>cumprob[j]) & (r<=cumprob[j+1]):
-            sample = j
-            break
-    return sample
 
 #--------------------------------------
 # the function that selects which controller (radarGuidance or wallFollower) to use
@@ -99,13 +53,6 @@ def strategyGating(arbitrationMethod,verbose=True):
   global choice_tm1
   global tLastChoice
   global rew
-  global wasChanged
-  global qdict
-  global alpha
-  global beta
-  global gamma
-  
-  choice_tm1 = choice
 
   # The chosen gating strategy is to be coded here:
   #------------------------------------------------
@@ -113,39 +60,10 @@ def strategyGating(arbitrationMethod,verbose=True):
     choice = random.randrange(2)
   #------------------------------------------------
   elif arbitrationMethod=='randomPersist':
-    #print('Persistent Random selection : to be implemented')
-    if choice == -1 or time.time() - tLastChoice > 2:
-        choice = random.randrange(2)
-        tLastChoice = time.time()
-        print("Choose strategy "+i2name[choice]+" for 2sec")
-    
+    print('Persistent Random selection : to be implemented')
   #------------------------------------------------
   elif arbitrationMethod=='qlearning':
-    #print('Q-Learning selection : to be implemented')
-    #Init dict
-    if S_t not in qdict:
-        qdict[S_t] = [0] * len(i2name)
-    if S_tm1 not in qdict:
-        qdict[S_tm1] = [0] * len(i2name)
-    
-    if S_tm1!=S_t or rew!=0 or wasChanged is True:
-        delta = rew + gamma  * np.max(qdict[S_t]) - qdict[S_tm1][choice_tm1]
-        qdict[S_tm1][choice_tm1] = qdict[S_tm1][choice_tm1] + alpha * delta
-        print("set to : {}".format(qdict[S_tm1][choice_tm1] + alpha * delta))
-        print("{} : {}".format(S_tm1, qdict[S_tm1][choice_tm1]))
-    
-    t = time.time()
-    
-    if S_tm1!=S_t or t-tLastChoice>2 or rew!=0:
-        wasChanged = True
-        tLastChoice = t
-        choice = discreteProb(softmax(qdict, S_tm1, beta))
-    else:
-        wasChanged = False
-    
-    rew = 0
-    
-    
+    print('Q-Learning selection : to be implemented')
   #------------------------------------------------
   else:
     print(arbitrationMethod+' unknown.')
@@ -199,19 +117,12 @@ def main():
 
   d = Display(env_map, robot)
 
-  method = 'qlearning'
+  method = 'random'
   # experiment related stuff
   startT = time.time()
   trial = 0
   nbTrials = 40
   trialDuration = np.zeros((nbTrials))
-  
-  if method == 'qlearning':
-      #Log Qlearning
-      positions = []
-      position = []
-      
-      pt = time.time()
 
   i = 0
   while trial<nbTrials:
@@ -222,10 +133,6 @@ def main():
     #-------------------------------------
     pos = robot.get_pos()
     # print("##########\nStep "+str(i)+" robot pos: x = "+str(int(pos.x()))+" y = "+str(int(pos.y()))+" theta = "+str(int(pos.theta()/math.pi*180.)))
-    
-    if method == 'qlearning' and time.time() - pt > 1:
-        pt = time.time()
-        position.append(pos)
 
     # has the robot found the reward ?
     #------------------------------------
@@ -243,10 +150,6 @@ def main():
       print("Trial "+str(trial)+" duration:"+str(trialDuration[trial]))
       trial +=1
       rew = 1
-      
-      if method == 'qlearning':
-          positions.append(position)
-          position = []
 
     # get the sensor inputs:
     #------------------------------------
@@ -284,19 +187,7 @@ def main():
     time.sleep(0.01)
 
   # When the experiment is over:
-  path = "log"
-  try:
-      os.makedirs(path)
-  except OSError:
-      print ("Creation of the directory %s failed" % path)
-  else:
-      print ("Successfully created the directory %s" % path)
-
   np.savetxt('log/'+str(startT)+'-TrialDurations-'+method+'.txt',trialDuration)
-  if method == 'qlearning':
-      np.save('log/'+str(startT) +'-Qpos', positions)
-      np.save('log/'+str(startT) +'-Qvalues', dict(qdict))
-
 
 #--------------------------------------
 

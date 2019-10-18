@@ -1,5 +1,3 @@
-*.txt
-*-corrige.py
-*.pyc
-*.DS_Store
-*.key
+src/
+__pycache__/
+
